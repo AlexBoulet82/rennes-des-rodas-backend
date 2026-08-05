@@ -9,30 +9,52 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use App\State\UserPasswordHasherProcessor;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: GroupRepository::class)]
-#[ORM\Table(name: '`group`')] // Bonne pratique : évite les conflits avec le mot-clé réservé SQL "group"
-#[ApiResource]
+#[ORM\Table(name: '`group`')]
+#[ApiResource(
+    normalizationContext: ['groups' => ['group:read']],
+    denormalizationContext: ['groups' => ['group:create']],
+    operations: [
+        new GetCollection(normalizationContext: ['groups' => ['group:read']]),
+        new Get(normalizationContext: ['groups' => ['group:read']]),
+        new Post(
+            processor: UserPasswordHasherProcessor::class,
+            denormalizationContext: ['groups' => ['group:create']]
+        ),
+    ]
+)]
 class Group implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['group:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['group:read', 'group:create'])]
     private ?string $name = null;
 
     #[ORM\Column(length: 180, unique: true)]
+    #[Groups(['group:read', 'group:create'])]
     private ?string $email = null;
 
     #[ORM\Column]
+    #[Groups(['group:read'])]
     private array $roles = [];
 
     #[ORM\Column(length: 255)]
+    #[Groups(['group:create'])]
     private ?string $password = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['group:read', 'group:create'])]
     private ?string $city = null;
 
     /**
@@ -84,9 +106,6 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    /**
-     * Identifiant unique pour la sécurité (l'email)
-     */
     public function getUserIdentifier(): string
     {
         return (string) $this->email;
@@ -95,9 +114,7 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
     public function getRoles(): array
     {
         $roles = $this->roles;
-        // Garantie que chaque groupe a au moins ROLE_USER
         $roles[] = 'ROLE_USER';
-
         return array_unique($roles);
     }
 
@@ -120,7 +137,7 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function eraseCredentials(): void
     {
-        // Si tu stockes des données temporaires sensibles, efface-les ici
+        // Nettoyage de données sensibles temporaires si besoin
     }
 
     /**
@@ -144,7 +161,6 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeGroupParticipation(GroupParticipation $groupParticipation): static
     {
         if ($this->groupParticipations->removeElement($groupParticipation)) {
-            // set the owning side to null (unless already changed)
             if ($groupParticipation->getGroupUser() === $this) {
                 $groupParticipation->setGroupUser(null);
             }

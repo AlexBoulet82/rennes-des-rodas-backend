@@ -17,6 +17,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
+use App\Controller\GroupParticipationCsvController;
 
 #[ORM\Entity(repositoryClass: GroupParticipationRepository::class)]
 #[ApiResource(
@@ -26,9 +27,16 @@ use Symfony\Component\Validator\Constraints as Assert;
     paginationMaximumItemsPerPage: 100,
     paginationItemsPerPage: 15,
     // 🚦 Configuration des opérations
-    operations: [
+  operations: [
+        // 🟢 NOUVELLE OPÉRATION POUR LE CSV EXPORT
+     new GetCollection(
+            uriTemplate: '/group_participations.csv',
+            controller: GroupParticipationCsvController::class,
+            read: false, // Le contrôleur gère lui-même la récupération des données
+            normalizationContext: ['groups' => ['participation:csv']],
+            
+        ),
         new GetCollection(
-            // 🟢 On applique les groupes CSV ou de lecture globale pour la collection
             normalizationContext: ['groups' => ['participation:read', 'participation:csv']]
         ),
         new Get(),
