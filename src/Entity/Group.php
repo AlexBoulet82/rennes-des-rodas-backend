@@ -12,6 +12,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Patch;
 use App\State\UserPasswordHasherProcessor;
 use Symfony\Component\Serializer\Attribute\Groups;
 
@@ -27,6 +28,9 @@ use Symfony\Component\Serializer\Attribute\Groups;
             processor: UserPasswordHasherProcessor::class,
             denormalizationContext: ['groups' => ['group:create']]
         ),
+        new Patch(
+            denormalizationContext: ['groups' => ['group:update']]
+        ),
     ]
 )]
 class Group implements UserInterface, PasswordAuthenticatedUserInterface
@@ -38,7 +42,7 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['group:read', 'group:create'])]
+    #[Groups(['group:read', 'group:create', 'group:update'])]
     private ?string $name = null;
 
     #[ORM\Column(length: 180, unique: true)]
@@ -54,8 +58,12 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $password = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['group:read', 'group:create'])]
+    #[Groups(['group:read', 'group:create', 'group:update'])]
     private ?string $city = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['group:read', 'group:create', 'group:update'])]
+    private ?string $photo = null;
 
     /**
      * @var Collection<int, GroupParticipation>
@@ -63,9 +71,16 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(mappedBy: 'groupUser', targetEntity: GroupParticipation::class, orphanRemoval: true)]
     private Collection $groupParticipations;
 
+    /**
+     * @var Collection<int, Song>
+     */
+    #[ORM\OneToMany(targetEntity: Song::class, mappedBy: 'grupo')]
+    private Collection $songs;
+
     public function __construct()
     {
         $this->groupParticipations = new ArrayCollection();
+        $this->songs = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -103,6 +118,17 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
     public function setCity(?string $city): static
     {
         $this->city = $city;
+        return $this;
+    }
+
+    public function getPhoto(): ?string
+    {
+        return $this->photo;
+    }
+
+    public function setPhoto(?string $photo): static
+    {
+        $this->photo = $photo;
         return $this;
     }
 
@@ -163,6 +189,35 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
         if ($this->groupParticipations->removeElement($groupParticipation)) {
             if ($groupParticipation->getGroupUser() === $this) {
                 $groupParticipation->setGroupUser(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Song>
+     */
+    public function getSongs(): Collection
+    {
+        return $this->songs;
+    }
+
+    public function addSong(Song $song): static
+    {
+        if (!$this->songs->contains($song)) {
+            $this->songs->add($song);
+            $song->setGrupo($this);
+        }
+
+        return $this;
+    }
+
+    public function removeSong(Song $song): static
+    {
+        if ($this->songs->removeElement($song)) {
+            if ($song->getGrupo() === $this) {
+                $song->setGrupo(null);
             }
         }
 
