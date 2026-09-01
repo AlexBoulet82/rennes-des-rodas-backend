@@ -42,7 +42,7 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['group:read', 'group:create', 'group:update'])]
+    #[Groups(['group:read', 'group:create', 'group:update','participation:read'])]
     private ?string $name = null;
 
     #[ORM\Column(length: 180, unique: true)]
@@ -75,6 +75,7 @@ class Group implements UserInterface, PasswordAuthenticatedUserInterface
      * @var Collection<int, Song>
      */
     #[ORM\OneToMany(targetEntity: Song::class, mappedBy: 'grupo')]
+    
     private Collection $songs;
 
     public function __construct()

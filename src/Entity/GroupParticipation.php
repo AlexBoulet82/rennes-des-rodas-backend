@@ -13,6 +13,8 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\GroupParticipationRepository;
 use App\State\GroupParticipationProcessor;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -27,14 +29,12 @@ use App\Controller\GroupParticipationCsvController;
     paginationMaximumItemsPerPage: 100,
     paginationItemsPerPage: 15,
     // 🚦 Configuration des opérations
-  operations: [
-        // 🟢 NOUVELLE OPÉRATION POUR LE CSV EXPORT
-     new GetCollection(
+    operations: [
+        new GetCollection(
             uriTemplate: '/group_participations.csv',
             controller: GroupParticipationCsvController::class,
-            read: false, // Le contrôleur gère lui-même la récupération des données
+            read: false,
             normalizationContext: ['groups' => ['participation:csv']],
-            
         ),
         new GetCollection(
             normalizationContext: ['groups' => ['participation:read', 'participation:csv']]
@@ -53,8 +53,6 @@ use App\Controller\GroupParticipationCsvController;
         new Patch(
             uriTemplate: '/group_participations/{id}/cancel',
             security: "is_granted('ROLE_ADMIN') or (is_granted('ROLE_USER') and object.getGroupUser() == user)",
-            securityMessage: "Vous ne pouvez annuler que vos propres participations.",
-            inputFormats: ['json' => ['application/json', 'application/merge-patch+json']],
             denormalizationContext: ['groups' => ['participation:cancel']]
         )
     ],
@@ -63,8 +61,7 @@ use App\Controller\GroupParticipationCsvController;
 // 🔍 Filtres de recherche, tri et date
 #[ApiFilter(SearchFilter::class, properties: [
     'status' => 'exact',
-    'edition' => 'exact',
-    'repertoire' => 'partial'
+    'edition' => 'exact'
 ])]
 #[ApiFilter(OrderFilter::class, properties: [
     'id' => 'ASC',
@@ -78,7 +75,7 @@ class GroupParticipation
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['participation:read', 'participation:csv'])] // 🟢 Ajout du groupe CSV pour avoir l'ID dans le tableau
+    #[Groups(['participation:read', 'participation:csv'])]
     private ?int $id = null;
 
     #[ORM\Column]
@@ -91,17 +88,15 @@ class GroupParticipation
         choices: ['pending', 'accepted', 'rejected', 'canceled'],
         message: 'Le statut "{{ value }}" n\'est pas valide. Les valeurs autorisées sont : {{ choices }}.'
     )]
-    #[Groups(['participation:read', 'participation:admin:write', 'participation:cancel', 'participation:csv'])]
+    #[Groups(['participation:read', 'participation:write', 'participation:cancel', 'participation:csv', 'participation:create'])]
     private ?string $status = 'pending';
 
-    #[ORM\Column(length: 255, nullable: true)] // 🟢 Champ optionnel
-    #[Assert\Length(
-        min: 3, 
-        max: 255, 
-        minMessage: 'Le répertoire doit contenir au moins {{ limit }} caractères si vous le renseignez.' // 🔧 Correction du placeholder
-    )]
-    #[Groups(['participation:read', 'participation:create', 'participation:admin:write', 'participation:csv'])]
-    private ?string $repertoire = null;
+    /**
+     * @var Collection<int, Song>
+     */
+    #[ORM\ManyToMany(targetEntity: Song::class)]
+    #[Groups(['participation:read', 'participation:create', 'participation:admin:write'])]
+    private Collection $songs;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Assert\Length(max: 2000)]
@@ -127,6 +122,7 @@ class GroupParticipation
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+        $this->songs = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -151,14 +147,26 @@ class GroupParticipation
         return $this;
     }
 
-    public function getRepertoire(): ?string
+    /**
+     * @return Collection<int, Song>
+     */
+    public function getSongs(): Collection
     {
-        return $this->repertoire;
+        return $this->songs;
     }
 
-    public function setRepertoire(?string $repertoire): static
+    public function addSong(Song $song): static
     {
-        $this->repertoire = $repertoire;
+        if (!$this->songs->contains($song)) {
+            $this->songs->add($song);
+        }
+
+        return $this;
+    }
+
+    public function removeSong(Song $song): static
+    {
+        $this->songs->removeElement($song);
 
         return $this;
     }

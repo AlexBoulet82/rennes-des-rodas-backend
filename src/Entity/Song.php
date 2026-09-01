@@ -39,11 +39,11 @@ class Song
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
-    #[Groups(['song:read', 'song:write'])]
+    #[Groups(['song:read', 'song:write', 'group:read','participation:read'])]
     private ?string $title = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['song:read', 'song:write'])]
+    #[Groups(['song:read', 'song:write', 'group:read'])]
     private ?string $artist = null;
 
     #[ORM\Column(length: 50, nullable: true)]
